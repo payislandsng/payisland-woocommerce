@@ -5,6 +5,8 @@ PayIsland for WooCommerce is the official WooCommerce payment gateway plugin for
 This Phase 1 release provides a clean hosted-checkout payment flow:
 
 - WooCommerce gateway registration
+- Modern WooCommerce Checkout Block support
+- Classic `[woocommerce_checkout]` shortcode checkout support
 - PayIsland transaction initialization
 - Redirect to PayIsland authorization URL
 - Customer return callback handling
@@ -45,6 +47,10 @@ The plugin does not require Composer at runtime.
    - **Debug Logging**: optional WooCommerce logs for requests and callbacks.
 
 Sandbox and live mode are not selected in the plugin. PayIsland determines sandbox or live mode from the API key.
+
+PayIsland supports both the modern WooCommerce Checkout Block and the classic `[woocommerce_checkout]` shortcode checkout. The plugin uses PayIsland hosted checkout, so customers are redirected to PayIsland after placing the order instead of entering card details in an embedded form on your site.
+
+If PayIsland does not appear in the Checkout Block or classic checkout payment methods, confirm that the gateway is enabled and that the required PayIsland settings are configured under **WooCommerce > Settings > Payments > PayIsland**.
 
 ## Payment Flow
 

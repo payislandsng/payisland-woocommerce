@@ -40,6 +40,7 @@ function payisland_woocommerce_init() {
 	require_once PAYISLAND_WOOCOMMERCE_PATH . 'includes/class-wc-gateway-payisland.php';
 
 	add_filter( 'woocommerce_payment_gateways', 'payisland_woocommerce_add_gateway' );
+	add_action( 'woocommerce_blocks_payment_method_type_registration', 'payisland_woocommerce_register_blocks_support' );
 
 	$handler = new PayIsland_Webhook_Handler();
 	add_action( 'woocommerce_api_payisland_callback', array( $handler, 'handle_callback' ) );
@@ -74,13 +75,36 @@ function payisland_woocommerce_add_gateway( $gateways ) {
 }
 
 /**
+ * Register PayIsland with WooCommerce Checkout Blocks.
+ *
+ * @param mixed $payment_method_registry WooCommerce Blocks payment method registry.
+ * @return void
+ */
+function payisland_woocommerce_register_blocks_support( $payment_method_registry ) {
+	if (
+		! class_exists( 'WooCommerce' ) ||
+		! class_exists( 'WC_Gateway_PayIsland' ) ||
+		! class_exists( '\Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType' )
+	) {
+		return;
+	}
+
+	require_once PAYISLAND_WOOCOMMERCE_PATH . 'includes/class-payisland-blocks-support.php';
+
+	if ( is_callable( array( $payment_method_registry, 'register' ) ) ) {
+		$payment_method_registry->register( new PayIsland_Blocks_Support() );
+	}
+}
+
+/**
  * Declare compatibility with WooCommerce custom order tables.
  *
  * @return void
  */
-function payisland_woocommerce_declare_hpos_compatibility() {
+function payisland_woocommerce_declare_woocommerce_compatibility() {
 	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
 		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', __FILE__, true );
 	}
 }
-add_action( 'before_woocommerce_init', 'payisland_woocommerce_declare_hpos_compatibility' );
+add_action( 'before_woocommerce_init', 'payisland_woocommerce_declare_woocommerce_compatibility' );
