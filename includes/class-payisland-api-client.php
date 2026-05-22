@@ -61,6 +61,8 @@ class PayIsland_API_Client {
 	 * @return array<string, mixed>
 	 */
 	public function initialize_transaction( array $payload ) {
+		$this->log_initialize_payload( $payload );
+
 		return $this->request(
 			'POST',
 			'/api/v1/transactions/in/initialize',
@@ -157,6 +159,7 @@ class PayIsland_API_Client {
 				array( 'message', 'error', 'data.message' ),
 				__( 'PayIsland API returned an unsuccessful response.', 'payisland-woocommerce' )
 			);
+			$message = sanitize_text_field( (string) $message );
 
 			PayIsland_Utils::log(
 				$this->logger,
@@ -165,11 +168,25 @@ class PayIsland_API_Client {
 				$this->debug_enabled
 			);
 
+			PayIsland_Utils::log(
+				$this->logger,
+				'error',
+				sprintf( 'PayIsland API error message: %s', $message ),
+				$this->debug_enabled
+			);
+
+			PayIsland_Utils::log(
+				$this->logger,
+				'error',
+				sprintf( 'PayIsland API response body: %s', $this->format_response_body_for_log( $raw_body, $body ) ),
+				$this->debug_enabled
+			);
+
 			return array(
 				'success'     => false,
 				'status_code' => $status_code,
 				'body'        => $body,
-				'message'     => sanitize_text_field( (string) $message ),
+				'message'     => $message,
 			);
 		}
 
@@ -179,5 +196,81 @@ class PayIsland_API_Client {
 			'body'        => $body,
 			'message'     => '',
 		);
+	}
+
+	/**
+	 * Log the sanitized transaction initialization payload when debug logging is enabled.
+	 *
+	 * @param array<string, mixed> $payload Transaction payload.
+	 * @return void
+	 */
+	private function log_initialize_payload( array $payload ) {
+		$customer_info = isset( $payload['customer_info'] ) && is_array( $payload['customer_info'] ) ? $payload['customer_info'] : array();
+
+		$sanitized_payload = array(
+			'callback_url'          => isset( $payload['callback_url'] ) ? esc_url_raw( (string) $payload['callback_url'] ) : '',
+			'payment_item_id'       => isset( $payload['payment_item_id'] ) ? sanitize_text_field( (string) $payload['payment_item_id'] ) : '',
+			'transaction_reference' => isset( $payload['transaction_reference'] ) ? sanitize_text_field( (string) $payload['transaction_reference'] ) : '',
+			'channel'               => isset( $payload['channel'] ) ? sanitize_text_field( (string) $payload['channel'] ) : '',
+			'amount'                => isset( $payload['amount'] ) ? (float) $payload['amount'] : 0,
+			'customer_info'         => array(
+				'email'      => isset( $customer_info['email'] ) ? sanitize_email( (string) $customer_info['email'] ) : '',
+				'phone'      => isset( $customer_info['phone'] ) ? sanitize_text_field( (string) $customer_info['phone'] ) : '',
+				'first_name' => isset( $customer_info['first_name'] ) ? sanitize_text_field( (string) $customer_info['first_name'] ) : '',
+				'last_name'  => isset( $customer_info['last_name'] ) ? sanitize_text_field( (string) $customer_info['last_name'] ) : '',
+			),
+		);
+
+		PayIsland_Utils::log(
+			$this->logger,
+			'debug',
+			sprintf( 'PayIsland initialize payload: %s', wp_json_encode( $sanitized_payload ) ),
+			$this->debug_enabled
+		);
+	}
+
+	/**
+	 * Format a response body for WooCommerce logs.
+	 *
+	 * @param string               $raw_body Raw response body.
+	 * @param array<string, mixed> $body Decoded response body.
+	 * @return string
+	 */
+	private function format_response_body_for_log( $raw_body, array $body ) {
+		$formatted_body = ! empty( $body ) ? wp_json_encode( $this->sanitize_log_data( $body ) ) : sanitize_textarea_field( (string) $raw_body );
+
+		if ( ! is_string( $formatted_body ) ) {
+			$formatted_body = '';
+		}
+
+		if ( strlen( $formatted_body ) > 5000 ) {
+			$formatted_body = substr( $formatted_body, 0, 5000 ) . '...';
+		}
+
+		return $formatted_body;
+	}
+
+	/**
+	 * Sanitize nested API response data for logging.
+	 *
+	 * @param mixed $data Response data.
+	 * @return mixed
+	 */
+	private function sanitize_log_data( $data ) {
+		if ( is_array( $data ) ) {
+			$sanitized = array();
+
+			foreach ( $data as $key => $value ) {
+				$sanitized[ sanitize_text_field( (string) $key ) ] = $this->sanitize_log_data( $value );
+			}
+
+			return $sanitized;
+		}
+
+		if ( is_bool( $data ) || is_int( $data ) || is_float( $data ) || null === $data ) {
+			return $data;
+		}
+
+		return sanitize_text_field( (string) $data );
 	}
 }
