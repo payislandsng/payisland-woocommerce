@@ -14,7 +14,7 @@ This Phase 1 release provides a clean hosted-checkout payment flow:
 - Verification-before-fulfillment using the PayIsland transaction status endpoint
 - WooCommerce order notes, order meta, and optional debug logs
 
-It intentionally does not include subscriptions, refunds, split settlement UI, multi-currency controls, WooCommerce Blocks checkout support, or advanced admin dashboards.
+It intentionally does not include subscriptions, refunds, split settlement UI, multi-currency controls, or advanced admin dashboards.
 
 ## Requirements
 
@@ -42,6 +42,7 @@ The plugin does not require Composer at runtime.
    - **Secret Key**: your PayIsland API secret key.
    - **Payment Item ID**: the PayIsland payment item ID for incoming transactions.
    - **Payment Channel**: `card`, `bank`, or `bank-transfer`.
+   - **Webhook URL**: the public POST endpoint PayIsland should call for payment notifications. The default is the plugin webhook endpoint.
    - **Order Status After Success**: keep WooCommerce default behavior or choose a specific status.
    - **Webhook Secret**: optional, if PayIsland provides a webhook signing secret.
    - **Debug Logging**: optional WooCommerce logs for requests and callbacks.
@@ -55,14 +56,35 @@ If PayIsland does not appear in the Checkout Block or classic checkout payment m
 ## Payment Flow
 
 1. The customer chooses **Pay with PayIsland** at checkout.
-2. The plugin creates a transaction reference such as `WC-123-1716380000`.
+2. The plugin creates a merchant/client transaction reference such as `WC-123-1716380000`.
 3. The plugin sends a `POST /api/v1/transactions/in/initialize` request to PayIsland.
-4. PayIsland returns an authorization URL.
-5. The plugin stores:
-   - `_payisland_reference`
+4. The initialize payload includes the configured webhook URL as `callback_url`, `customer_info.phone_number`, and the WooCommerce order total as a major-unit string amount.
+5. PayIsland returns an authorization URL and PayIsland transaction reference.
+6. The plugin stores:
+   - `_payisland_reference` for the PayIsland-generated reference, such as `PISL...` or `PIST...`
+   - `_payisland_client_reference` for the WooCommerce-generated client reference
    - `_payisland_authorization_url`
-6. The customer is redirected to PayIsland.
-7. On callback or webhook, the plugin verifies the transaction through `GET /api/v1/transactions/in/check-transaction-status/{reference}` before updating the WooCommerce order.
+7. The customer is redirected to PayIsland.
+8. On callback or webhook, the plugin verifies the transaction through `GET /api/v1/transactions/in/check-transaction-status/{reference}` using the PayIsland-generated reference before updating the WooCommerce order.
+
+## API Endpoint Alignment
+
+The plugin follows the PayIsland quickstart endpoints:
+
+- Initialize transaction: `POST /api/v1/transactions/in/initialize`
+- Verify transaction: `GET /api/v1/transactions/in/check-transaction-status/{reference}`
+
+PayIsland’s initialize response returns `data.reference`, which is the reference used for verification, webhook lookup, and support. The plugin stores the WooCommerce-generated `transaction_reference` separately as `_payisland_client_reference`.
+
+Amounts are sent to PayIsland as strings in the major currency unit, for example `"7000"` for ₦7,000. Whole amounts such as `7000.00` are sent without trailing decimals.
+
+PayIsland webhook URL setting:
+
+```text
+?wc-api=payisland_webhook
+```
+
+The webhook URL can be changed in **WooCommerce > Settings > Payments > PayIsland** if a store needs to expose a different public endpoint.
 
 ## Callback and Webhook Notes
 

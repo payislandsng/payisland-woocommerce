@@ -33,6 +33,13 @@ class WC_Gateway_PayIsland extends WC_Payment_Gateway {
 	protected $payment_channel;
 
 	/**
+	 * Webhook URL sent to PayIsland as callback_url.
+	 *
+	 * @var string
+	 */
+	protected $webhook_url;
+
+	/**
 	 * Success order status setting.
 	 *
 	 * @var string
@@ -70,6 +77,7 @@ class WC_Gateway_PayIsland extends WC_Payment_Gateway {
 		$this->secret_key                 = $this->get_option( 'secret_key', '' );
 		$this->payment_item_id            = $this->get_option( 'payment_item_id', '' );
 		$this->payment_channel            = $this->get_option( 'payment_channel', 'card' );
+		$this->webhook_url                = $this->get_option( 'webhook_url', PayIsland_Utils::wc_api_url( 'payisland_webhook' ) );
 		$this->order_status_after_success = $this->get_option( 'order_status_after_success', 'default' );
 		$this->debug_logging              = 'yes' === $this->get_option( 'debug_logging', 'no' );
 
@@ -127,6 +135,13 @@ class WC_Gateway_PayIsland extends WC_Payment_Gateway {
 					'bank'          => __( 'Bank', 'payisland-woocommerce' ),
 					'bank-transfer' => __( 'Bank transfer', 'payisland-woocommerce' ),
 				),
+				'desc_tip'    => true,
+			),
+			'webhook_url'                => array(
+				'title'       => __( 'Webhook URL', 'payisland-woocommerce' ),
+				'type'        => 'text',
+				'description' => __( 'Public URL PayIsland should call for payment notifications. This is sent to PayIsland as callback_url during transaction initialization and must accept POST requests.', 'payisland-woocommerce' ),
+				'default'     => PayIsland_Utils::wc_api_url( 'payisland_webhook' ),
 				'desc_tip'    => true,
 			),
 			'order_status_after_success' => array(
@@ -190,18 +205,19 @@ class WC_Gateway_PayIsland extends WC_Payment_Gateway {
 			throw new Exception( esc_html__( 'PayIsland is not fully configured. Please contact the store owner.', 'payisland-woocommerce' ) );
 		}
 
-		$reference = PayIsland_Utils::generate_transaction_reference( $order );
-		$payload   = array(
-			'callback_url'          => PayIsland_Utils::wc_api_url( 'payisland_callback' ),
+		$client_reference = PayIsland_Utils::generate_transaction_reference( $order );
+		$webhook_url      = PayIsland_Utils::get_webhook_url( $this->settings );
+		$payload          = array(
+			'callback_url'          => $webhook_url,
 			'payment_item_id'       => sanitize_text_field( $this->payment_item_id ),
-			'transaction_reference' => $reference,
+			'transaction_reference' => $client_reference,
 			'channel'               => sanitize_text_field( $this->payment_channel ),
-			'amount'                => (float) $order->get_total(),
+			'amount'                => PayIsland_Utils::format_major_unit_amount( $order->get_total() ),
 			'customer_info'         => array(
-				'first_name' => $order->get_billing_first_name(),
-				'last_name'  => $order->get_billing_last_name(),
-				'email'      => $order->get_billing_email(),
-				'phone'      => $order->get_billing_phone(),
+				'first_name'   => $order->get_billing_first_name(),
+				'last_name'    => $order->get_billing_last_name(),
+				'email'        => $order->get_billing_email(),
+				'phone_number' => $order->get_billing_phone(),
 			),
 		);
 
@@ -222,22 +238,39 @@ class WC_Gateway_PayIsland extends WC_Payment_Gateway {
 			throw new Exception( esc_html__( 'Unable to start PayIsland payment. Please try again.', 'payisland-woocommerce' ) );
 		}
 
-		$authorization_url = PayIsland_Utils::extract_authorization_url( $response['body'] );
+		$authorization_url         = PayIsland_Utils::extract_authorization_url( $response['body'] );
+		$payisland_reference       = PayIsland_Utils::extract_payisland_reference( $response['body'] );
+		$response_client_reference = PayIsland_Utils::extract_client_reference( $response['body'] );
+
+		if ( '' === $payisland_reference ) {
+			$payisland_reference = PayIsland_Utils::extract_reference_from_url( $authorization_url );
+		}
+
+		if ( '' === $response_client_reference ) {
+			$response_client_reference = $client_reference;
+		}
 
 		if ( '' === $authorization_url ) {
 			$order->add_order_note( __( 'PayIsland payment initialization failed: authorization URL was missing.', 'payisland-woocommerce' ) );
 			throw new Exception( esc_html__( 'Unable to start PayIsland payment. Please try again.', 'payisland-woocommerce' ) );
 		}
 
-		$order->update_meta_data( PayIsland_Utils::META_REFERENCE, $reference );
+		if ( '' === $payisland_reference ) {
+			$order->add_order_note( __( 'PayIsland payment initialization failed: transaction reference was missing from the response.', 'payisland-woocommerce' ) );
+			throw new Exception( esc_html__( 'Unable to start PayIsland payment. Please try again.', 'payisland-woocommerce' ) );
+		}
+
+		$order->update_meta_data( PayIsland_Utils::META_REFERENCE, $payisland_reference );
+		$order->update_meta_data( PayIsland_Utils::META_CLIENT_REFERENCE, $response_client_reference );
 		$order->update_meta_data( PayIsland_Utils::META_AUTHORIZATION_URL, $authorization_url );
 		$order->save();
 
 		$order->add_order_note(
 			sprintf(
-				/* translators: %s: PayIsland transaction reference. */
-				__( 'PayIsland payment initialized. Reference: %s', 'payisland-woocommerce' ),
-				$reference
+				/* translators: 1: PayIsland transaction reference, 2: merchant client reference. */
+				__( 'PayIsland payment initialized. PayIsland reference: %1$s. Client reference: %2$s.', 'payisland-woocommerce' ),
+				$payisland_reference,
+				$response_client_reference
 			)
 		);
 

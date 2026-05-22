@@ -9,5 +9,7 @@ Minimum checks before packaging:
 - Activate the plugin with WooCommerce inactive and confirm no fatal error occurs
 - Activate WooCommerce, enable PayIsland, and configure `secret_key` and `payment_item_id`
 - Place a test order and confirm redirect to PayIsland authorization URL
+- Confirm the initialize payload sends `callback_url`, `customer_info.phone_number`, and `amount` as a major-unit string, for example `"7000"` for ₦7,000
+- Confirm the order stores PayIsland's returned `_payisland_reference` and the WooCommerce `_payisland_client_reference`
 - Return through `?wc-api=payisland_callback&reference=<reference>` and confirm the plugin verifies before completing the order
 - Send a webhook to `?wc-api=payisland_webhook` and confirm fulfillment is idempotent

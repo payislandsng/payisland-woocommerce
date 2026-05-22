@@ -33,7 +33,8 @@ class PayIsland_Webhook_Handler {
 			exit;
 		}
 
-		$result = $this->verify_and_update_order( $order, $reference, 'callback' );
+		$verification_reference = $this->get_verification_reference( $order, $reference );
+		$result                 = $this->verify_and_update_order( $order, $verification_reference, 'callback' );
 
 		if ( 'success' === $result['group'] ) {
 			wp_safe_redirect( $order->get_checkout_order_received_url() );
@@ -86,7 +87,8 @@ class PayIsland_Webhook_Handler {
 			wp_send_json_error( array( 'message' => 'Order not found.' ), 404 );
 		}
 
-		$result = $this->verify_and_update_order( $order, $reference, 'webhook' );
+		$verification_reference = $this->get_verification_reference( $order, $reference );
+		$result                 = $this->verify_and_update_order( $order, $verification_reference, 'webhook' );
 
 		if ( empty( $result['verified'] ) ) {
 			wp_send_json_error( array( 'message' => 'Transaction verification failed.' ), 400 );
@@ -199,6 +201,23 @@ class PayIsland_Webhook_Handler {
 		if ( 'failed' === $group && ! $order->is_paid() && ! $order->has_status( array( 'failed', 'cancelled' ) ) ) {
 			$order->update_status( 'failed', __( 'PayIsland payment failed after verification.', 'payisland-woocommerce' ) );
 		}
+	}
+
+	/**
+	 * Get the PayIsland-generated reference to use for verification.
+	 *
+	 * @param WC_Order $order WooCommerce order.
+	 * @param string   $fallback_reference Fallback request reference.
+	 * @return string
+	 */
+	private function get_verification_reference( $order, $fallback_reference ) {
+		$payisland_reference = (string) $order->get_meta( PayIsland_Utils::META_REFERENCE );
+
+		if ( '' !== $payisland_reference ) {
+			return sanitize_text_field( $payisland_reference );
+		}
+
+		return sanitize_text_field( $fallback_reference );
 	}
 
 	/**

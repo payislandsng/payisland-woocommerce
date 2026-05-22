@@ -212,12 +212,12 @@ class PayIsland_API_Client {
 			'payment_item_id'       => isset( $payload['payment_item_id'] ) ? sanitize_text_field( (string) $payload['payment_item_id'] ) : '',
 			'transaction_reference' => isset( $payload['transaction_reference'] ) ? sanitize_text_field( (string) $payload['transaction_reference'] ) : '',
 			'channel'               => isset( $payload['channel'] ) ? sanitize_text_field( (string) $payload['channel'] ) : '',
-			'amount'                => isset( $payload['amount'] ) ? (float) $payload['amount'] : 0,
+			'amount'                => isset( $payload['amount'] ) ? sanitize_text_field( (string) $payload['amount'] ) : '',
 			'customer_info'         => array(
-				'email'      => isset( $customer_info['email'] ) ? sanitize_email( (string) $customer_info['email'] ) : '',
-				'phone'      => isset( $customer_info['phone'] ) ? sanitize_text_field( (string) $customer_info['phone'] ) : '',
-				'first_name' => isset( $customer_info['first_name'] ) ? sanitize_text_field( (string) $customer_info['first_name'] ) : '',
-				'last_name'  => isset( $customer_info['last_name'] ) ? sanitize_text_field( (string) $customer_info['last_name'] ) : '',
+				'email'        => isset( $customer_info['email'] ) ? sanitize_email( (string) $customer_info['email'] ) : '',
+				'phone_number' => isset( $customer_info['phone_number'] ) ? sanitize_text_field( (string) $customer_info['phone_number'] ) : '',
+				'first_name'   => isset( $customer_info['first_name'] ) ? sanitize_text_field( (string) $customer_info['first_name'] ) : '',
+				'last_name'    => isset( $customer_info['last_name'] ) ? sanitize_text_field( (string) $customer_info['last_name'] ) : '',
 			),
 		);
 
