@@ -46,3 +46,22 @@ wp-config.php
 # Note: If you wish to whitelist themes,
 # uncomment the next line
 #/wp-content/themes
+
+# Local operating system files.
+.DS_Store
+Thumbs.db
+
+# WordPress plugin build artifacts.
+*.zip
+build/
+dist/
+
+# Local development.
+.idea/
+.vscode/
+node_modules/
+vendor/
+
+# Environment files.
+.env
+.env.*
