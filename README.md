@@ -130,6 +130,83 @@ find includes -name "*.php" -print0 | xargs -0 -n1 php -l
 
 Manual testing checklist is available in `tests/README.md`.
 
+## Local Docker Testing
+
+This repository includes a Docker Compose environment for testing the plugin without installing PHP on the host.
+
+Start WordPress and MySQL:
+
+```bash
+docker compose up -d
+```
+
+Then open:
+
+```text
+http://localhost:8080
+```
+
+Complete the WordPress setup wizard in the browser. The Compose file uses local-only throwaway database credentials and mounts this repository into:
+
+```text
+/var/www/html/wp-content/plugins/payisland-woocommerce
+```
+
+### Install WooCommerce
+
+1. Log in to WordPress admin at `http://localhost:8080/wp-admin`.
+2. Go to **Plugins > Add New**.
+3. Search for **WooCommerce**.
+4. Install and activate WooCommerce.
+5. Complete the WooCommerce setup wizard with any local test store details.
+
+### Activate PayIsland
+
+1. Go to **Plugins > Installed Plugins**.
+2. Activate **PayIsland for WooCommerce**.
+3. Go to **WooCommerce > Settings > Payments**.
+4. Enable **PayIsland**.
+
+### Configure the Gateway
+
+In **WooCommerce > Settings > Payments > PayIsland**, configure:
+
+- **Secret Key**: use a PayIsland sandbox or test key. Do not commit real keys.
+- **Payment Item ID**: use the PayIsland payment item ID for testing.
+- **Payment Channel**: choose `card`, `bank`, or `bank-transfer`.
+- **Webhook Secret**: optional, only if PayIsland provides a test webhook signing secret.
+- **Debug Logging**: enable while testing if you need WooCommerce logs.
+
+Sandbox and live mode are still controlled by the PayIsland API key. There is no plugin environment selector.
+
+### Manual Test Checklist
+
+- Confirm WordPress loads at `http://localhost:8080`.
+- Confirm WooCommerce installs and activates successfully.
+- Confirm **PayIsland for WooCommerce** activates without fatal errors.
+- Confirm **PayIsland** appears under **WooCommerce > Settings > Payments**.
+- Configure a test secret key and payment item ID.
+- Create a simple WooCommerce product.
+- Place an order using PayIsland at checkout.
+- Confirm checkout redirects to the PayIsland authorization URL.
+- Confirm the order stores `_payisland_reference` and `_payisland_authorization_url`.
+- Test the callback URL with a known reference: `http://localhost:8080/?wc-api=payisland_callback&reference=<reference>`.
+- Confirm callback handling verifies the transaction before completing, pending, or failing the order.
+- Send a webhook request to `http://localhost:8080/?wc-api=payisland_webhook`.
+- Confirm webhook handling verifies the transaction before fulfillment and is safe to retry.
+
+Stop the environment:
+
+```bash
+docker compose down
+```
+
+Remove the local database volume if you want a fresh WordPress install:
+
+```bash
+docker compose down -v
+```
+
 ## License
 
 MIT. See `LICENSE`.
