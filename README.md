@@ -1,5 +1,7 @@
 # PayIsland for WooCommerce
 
+![CI](https://github.com/payislandsng/payisland-woocommerce/actions/workflows/ci.yml/badge.svg)
+
 PayIsland for WooCommerce is the official WooCommerce payment gateway plugin for accepting payments through PayIsland.
 
 This Phase 1 release provides a clean hosted-checkout payment flow:
